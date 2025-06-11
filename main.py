@@ -1,8 +1,13 @@
 import tkinter as tk
-from tkinterdnd2 import TkinterDnD, DND_FILES  # Para permitir arrastrar y soltar archivos
+from tkinterdnd2 import TkinterDnD, DND_FILES
 from PIL import Image, ImageTk
 import io
 import pyzbar.pyzbar as pyzbar
+import pyautogui
+import numpy as np
+import keyboard
+import threading
+from time import sleep
 
 # Función para detectar y leer el código QR de una imagen
 def leer_qr(imagen):
@@ -38,19 +43,6 @@ def cargar_imagen(imagen):
         resultado.config(text=f'Error al procesar la imagen: {e}')
         panel.config(image=None)  # Eliminar imagen anterior en caso de error
 
-# Función que se activa cuando se pega una imagen
-def pegar_imagen(event=None):
-    try:
-        # Intentar obtener el contenido del portapapeles
-        clipboard_content = root.clipboard_get()
-        
-        if clipboard_content:
-            # Convertir el contenido del portapapeles en imagen
-            image = Image.open(io.BytesIO(clipboard_content.encode('latin1')))
-            cargar_imagen(image)
-    except Exception as e:
-        resultado.config(text=f'Error al pegar la imagen: {e}')
-
 # Función que se activa cuando se arrastra una imagen
 def arrastrar_imagen(event):
     try:
@@ -72,6 +64,102 @@ def copiar_al_portapapeles():
     else:
         resultado.config(text='No hay enlace para copiar.')
 
+# Nueva función para capturar área de pantalla
+def capturar_area_pantalla():
+    resultado.config(text="Selecciona el área con el código QR (presiona ESC para cancelar)")
+    root.withdraw()  # Ocultar ventana principal temporalmente
+    
+    # Crear una nueva ventana transparente a pantalla completa
+    selector = tk.Toplevel()
+    selector.attributes("-fullscreen", True)
+    selector.attributes("-alpha", 0.3)
+    selector.configure(bg="black")
+    
+    area_seleccion = {"inicio_x": 0, "inicio_y": 0, "fin_x": 0, "fin_y": 0, "seleccionando": False}
+    rectangulo = None
+    
+    def comenzar_seleccion(event):
+        area_seleccion["inicio_x"] = event.x
+        area_seleccion["inicio_y"] = event.y
+        area_seleccion["seleccionando"] = True
+        
+        nonlocal rectangulo
+        if rectangulo:
+            selector.canvas.delete(rectangulo)
+        
+        rectangulo = selector.canvas.create_rectangle(
+            event.x, event.y, event.x, event.y,
+            outline="red", width=2
+        )
+    
+    def actualizar_seleccion(event):
+        if area_seleccion["seleccionando"]:
+            area_seleccion["fin_x"] = event.x
+            area_seleccion["fin_y"] = event.y
+            
+            selector.canvas.coords(
+                rectangulo,
+                area_seleccion["inicio_x"], area_seleccion["inicio_y"],
+                area_seleccion["fin_x"], area_seleccion["fin_y"]
+            )
+    
+    def finalizar_seleccion(event):
+        if area_seleccion["seleccionando"]:
+            area_seleccion["fin_x"] = event.x
+            area_seleccion["fin_y"] = event.y
+            area_seleccion["seleccionando"] = False
+            
+            # Asegurarse que las coordenadas estén en el orden correcto (inicio < fin)
+            x1 = min(area_seleccion["inicio_x"], area_seleccion["fin_x"])
+            y1 = min(area_seleccion["inicio_y"], area_seleccion["fin_y"])
+            x2 = max(area_seleccion["inicio_x"], area_seleccion["fin_x"])
+            y2 = max(area_seleccion["inicio_y"], area_seleccion["fin_y"])
+            
+            # Capturar el área seleccionada
+            selector.destroy()
+            sleep(0.2)  # Pequeña pausa para que la ventana desaparezca completamente
+            
+            try:
+                # Capturar el área seleccionada
+                screenshot = pyautogui.screenshot(region=(x1, y1, x2-x1, y2-y1))
+                
+                # Restaurar la ventana principal y procesar la captura
+                root.after(100, lambda: procesar_captura(screenshot))
+            except Exception as e:
+                root.deiconify()
+                resultado.config(text=f"Error en la captura: {str(e)}")
+    
+    def cancelar_seleccion(event=None):
+        selector.destroy()
+        root.deiconify()
+        resultado.config(text="Captura cancelada")
+    
+    # Canvas transparente para dibujar la selección
+    selector.canvas = tk.Canvas(selector, highlightthickness=0)
+    selector.canvas.pack(fill="both", expand=True)
+    # Aquí está el cambio: usar el mismo color que el selector en lugar de cadena vacía
+    selector.canvas.configure(bg="black", highlightthickness=0)
+    selector.canvas.bind("<ButtonPress-1>", comenzar_seleccion)
+    selector.canvas.bind("<B1-Motion>", actualizar_seleccion)
+    selector.canvas.bind("<ButtonRelease-1>", finalizar_seleccion)
+    selector.bind("<Escape>", cancelar_seleccion)
+
+    # Agregar un manejador para cerrar la ventana con la tecla 'q'
+    def cerrar_ventana(event=None):
+        cancelar_seleccion()
+    
+    selector.bind("q", cerrar_ventana)
+    # Agregar un protocolo para el botón de cierre (X)
+    selector.protocol("WM_DELETE_WINDOW", cancelar_seleccion)
+
+def procesar_captura(screenshot):
+    root.deiconify()  # Mostrar ventana principal nuevamente
+    try:
+        # Convertir la captura a formato PIL Image
+        cargar_imagen(screenshot)
+    except Exception as e:
+        resultado.config(text=f"Error al procesar la captura: {str(e)}")
+
 # Configuración de la interfaz gráfica
 root = TkinterDnD.Tk()
 
@@ -83,15 +171,16 @@ panel = tk.Label(root)
 panel.pack(pady=20)
 
 # Etiqueta para mostrar el resultado (enlace del código QR)
-resultado = tk.Label(root, text="Pega una imagen con Ctrl+V o arrástrala aquí", wraplength=400)
+resultado = tk.Label(root, text="Selecciona un área de pantalla o arrastra una imagen", wraplength=400)
 resultado.pack(pady=20)
 
 # Botón para copiar el enlace al portapapeles
 copiar_btn = tk.Button(root, text="Copiar Enlace al Portapapeles", command=copiar_al_portapapeles)
-copiar_btn.pack(pady=20)
+copiar_btn.pack(pady=10)
 
-# Vincular la acción de pegar (Ctrl+V) a la función de pegar_imagen
-root.bind("<Control-v>", pegar_imagen)
+# Nuevo botón para capturar área de pantalla
+capturar_btn = tk.Button(root, text="Capturar Área de Pantalla", command=capturar_area_pantalla)
+capturar_btn.pack(pady=10)
 
 # Configurar la interfaz para aceptar arrastrar y soltar archivos
 root.drop_target_register(DND_FILES)

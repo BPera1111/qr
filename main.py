@@ -174,13 +174,20 @@ panel.pack(pady=20)
 resultado = tk.Label(root, text="Selecciona un área de pantalla o arrastra una imagen", wraplength=400)
 resultado.pack(pady=20)
 
-# Botón para copiar el enlace al portapapeles
-copiar_btn = tk.Button(root, text="Copiar Enlace al Portapapeles", command=copiar_al_portapapeles)
-copiar_btn.pack(pady=10)
+# Función para volver al estado inicial
+def volver_al_inicio():
+    panel.config(image=None)
+    resultado.config(text="Selecciona un área de pantalla o arrastra una imagen")
+    global enlace_qr
+    enlace_qr = None
 
 # Nuevo botón para capturar área de pantalla
 capturar_btn = tk.Button(root, text="Capturar Área de Pantalla", command=capturar_area_pantalla)
 capturar_btn.pack(pady=10)
+
+# Botón para volver al inicio
+volver_btn = tk.Button(root, text="Volver al Inicio", command=volver_al_inicio)
+volver_btn.pack(pady=10)
 
 # Configurar la interfaz para aceptar arrastrar y soltar archivos
 root.drop_target_register(DND_FILES)

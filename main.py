@@ -13,7 +13,7 @@ def leer_qr(imagen):
         return obj.data.decode('utf-8')
     return None  # Si no hay código QR
 
-# Función que se activa cuando se pega o se arrastra una imagen
+# Función para cargar la imagen y mostrarla
 def cargar_imagen(imagen):
     try:
         # Redimensionar para mostrar la imagen en la interfaz
@@ -28,8 +28,12 @@ def cargar_imagen(imagen):
         qr_result = leer_qr(imagen)
         if qr_result:
             resultado.config(text=f'Código QR encontrado: {qr_result}')
+            # Guardar el enlace en una variable para copiarlo después
+            global enlace_qr
+            enlace_qr = qr_result
         else:
             resultado.config(text='No se encontró un código QR.')
+            enlace_qr = None
     except Exception as e:
         resultado.config(text=f'Error al procesar la imagen: {e}')
         panel.config(image=None)  # Eliminar imagen anterior en caso de error
@@ -59,6 +63,15 @@ def arrastrar_imagen(event):
     except Exception as e:
         resultado.config(text=f'Error al arrastrar la imagen: {e}')
 
+# Función para copiar el enlace al portapapeles
+def copiar_al_portapapeles():
+    if enlace_qr:
+        root.clipboard_clear()  # Limpiar el portapapeles
+        root.clipboard_append(enlace_qr)  # Copiar el enlace del QR al portapapeles
+        resultado.config(text=f'Enlace copiado al portapapeles: {enlace_qr}')
+    else:
+        resultado.config(text='No hay enlace para copiar.')
+
 # Configuración de la interfaz gráfica
 root = TkinterDnD.Tk()
 
@@ -73,12 +86,19 @@ panel.pack(pady=20)
 resultado = tk.Label(root, text="Pega una imagen con Ctrl+V o arrástrala aquí", wraplength=400)
 resultado.pack(pady=20)
 
+# Botón para copiar el enlace al portapapeles
+copiar_btn = tk.Button(root, text="Copiar Enlace al Portapapeles", command=copiar_al_portapapeles)
+copiar_btn.pack(pady=20)
+
 # Vincular la acción de pegar (Ctrl+V) a la función de pegar_imagen
 root.bind("<Control-v>", pegar_imagen)
 
 # Configurar la interfaz para aceptar arrastrar y soltar archivos
 root.drop_target_register(DND_FILES)
 root.dnd_bind('<<Drop>>', arrastrar_imagen)
+
+# Inicializar la variable global para almacenar el enlace del código QR
+enlace_qr = None
 
 # Iniciar la interfaz gráfica
 root.mainloop()

@@ -185,6 +185,10 @@ def volver_al_inicio():
 capturar_btn = tk.Button(root, text="Capturar Área de Pantalla", command=capturar_area_pantalla)
 capturar_btn.pack(pady=10)
 
+# Botón para copiar el enlace al portapapeles
+copiar_btn = tk.Button(root, text="Copiar Enlace al Portapapeles", command=copiar_al_portapapeles)
+copiar_btn.pack(pady=10)
+
 # Botón para volver al inicio
 volver_btn = tk.Button(root, text="Volver al Inicio", command=volver_al_inicio)
 volver_btn.pack(pady=10)
